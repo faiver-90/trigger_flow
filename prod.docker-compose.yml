@@ -1,0 +1,123 @@
+services:
+  nginx:
+    container_name: nginx
+    image: nginx
+    restart: always
+    volumes:
+      - ./nginx_conf/default.conf:/etc/nginx/conf.d/default.conf
+      - ./nginx_conf/nginx.conf:/etc/nginx/nginx.conf
+    ports:
+      - "8000:80"
+    depends_on:
+      - main_service
+
+  main_service:
+#    container_name: main
+    build: .
+    deploy:
+      replicas: 4
+    command: >
+      bash -c "
+      pip install --no-cache-dir -r requirements.txt &&
+      alembic upgrade head &&
+      gunicorn src.main_app.init_app:app
+      --workers=2
+      --worker-class=uvicorn.workers.UvicornWorker
+      --bind=0.0.0.0:8001
+      --timeout=90
+      --keep-alive=75
+      --access-logfile - --error-logfile -"
+    restart: always
+    volumes:
+      - ./:/app
+    expose:
+      - "8001"
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - redis
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  celery-beat:
+    container_name: main_beat
+    restart: unless-stopped
+    build: .
+    command: bash -c "
+      pip install -r requirements.txt &&
+      celery -A src.shared.celery_module.celery_worker.celery_app beat -l info"
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+    volumes:
+      - ./:/app
+    depends_on:
+      - db
+      - redis
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  celery-worker:
+    container_name: main_celery
+    build: .
+    restart: unless-stopped
+    command: bash -c "
+      pip install -r requirements.txt &&
+      celery -A src.shared.celery_module.celery_worker.celery_app worker -l info"
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+    volumes:
+      - ./:/app
+    depends_on:
+      - db
+      - redis
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  db:
+    container_name: db
+    image: postgres:14-alpine
+    restart: always
+    command: postgres -c max_connections=500
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    expose:
+      - 5432
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+
+  redis:
+    container_name: redis
+    image: redis:latest
+    restart: always
+    env_file:
+      - .env
+    ports:
+      - "6379:6379"
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_PORT=6379
+      - REDIS_DATABASES=16
+
+#  rabbitmq:
+#    container_name: rabbit
+#    image: rabbitmq:3.10.7-management
+#    ports:
+#      - "5672:5672"     # ← AMQP для Celery и других клиентов
+#      - "15672:15672"   # ← Web UI 8777
+
+# docker swarm init - на проде один раз инит
+volumes:
+  postgres_data:

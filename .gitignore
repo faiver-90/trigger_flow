@@ -1,0 +1,56 @@
+# Файлы окружения
+.env
+.env.*          # .env.dev, .env.prod и т.п.
+*.env
+
+# Python: кэш и временные файлы
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Виртуальные окружения
+.venv/
+**/.venv/
+venv/
+**/venv/
+env/
+**/env/
+
+# Celery, логирование
+celerybeat-schedule
+*.log
+log.log
+logs/
+
+# Django/media/static
+media/
+**/media/
+static/
+**/static/
+
+# Django локальные настройки
+local.py
+
+# Временные и пользовательские файлы
+.vscode/
+**/.idea/
+.mailinglist_data/
+mailinglist_data/
+sh_scripts_custom/
+usr/
+reports/
+
+# IDE специфическое
+*.iml
+.idea/
+
+# Docker
+*.pid
+*.db
+*.sqlite3
+
+# PyCharm / VSCode
+*.sublime*
+
